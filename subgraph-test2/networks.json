@@ -1,0 +1,11 @@
+{
+  "chapel": {
+    "PrivateGroupFactory": {
+      "address": "0x526Df2C43012416a2969615DE2c39280f5DE94Aa",
+      "startBlock": 28593554
+    },
+    "PrivateRounds": {
+      "address": "0x609D78708B46aB5F0FfdF4FD42e3530eE781671B"
+    }
+  }
+}

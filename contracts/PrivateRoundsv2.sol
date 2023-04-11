@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.9;
 
-/// @title PrivateRounds - MEMBER_ROLE holders pledge eth in exchange for tokens
+/// @title PrivateRoundsv1 - MEMBER_ROLE holders pledge stablecoins in exchange for tokens
 /// @author styliann.eth <ns2808@proton.me>
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -18,6 +18,7 @@ contract PrivateRounds is AccessControl {
         uint32 roundId,
         uint target,
         uint groupAllocation,
+        uint maxPledge,
         uint32 startAt,
         uint32 endAt
     );
@@ -36,8 +37,8 @@ contract PrivateRounds is AccessControl {
         address indexed caller,
         uint amount
     );
-    event TotalEthPledgedChanged(uint32 indexed roundId, uint totalEthPledged);
-    event TotalEthWithdrawn(uint32 indexed roundId);
+    event TotalUsdPledgedChanged(uint32 indexed roundId, uint totalEthPledged);
+    event TotalUsdWithdrawn(uint32 indexed roundId);
     event InvestorRefunded(
         uint32 indexed roundId,
         address indexed caller,
@@ -63,28 +64,30 @@ contract PrivateRounds is AccessControl {
         uint target;
         uint groupAllocation;
         uint maxPledge;
-        uint totalEthPledged;
+        uint totalUsdPledged;
         uint32 startAt;
         uint32 endAt;
-        bool isEthClaimed;
+        bool isUsdClaimed;
         uint totalTokensReceived;
         address tokenAddress;
     }
 
     uint32 public numOfRounds;
     string public groupName;
+    IERC20 public stablecoinContract;
     mapping(uint => Round) public rounds;
     mapping(uint => mapping(address => uint)) public pledgedAmounts;
 
     // Investor addresses must be granted MEMBER_ROLE by contract deployer
     bytes32 public constant MEMBER_ROLE = keccak256("MEMBER_ROLE");
 
-    constructor(address _groupCreator, string memory _groupName) {
+    constructor(string memory _groupName, address _stablecoinAddress) {
         // Contract deployer gets DEFAULT_ADMIN_ROLE
-        _grantRole(DEFAULT_ADMIN_ROLE, _groupCreator);
-        _grantRole(MEMBER_ROLE, _groupCreator);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(MEMBER_ROLE, msg.sender);
 
         groupName = _groupName;
+        stablecoinContract = IERC20(_stablecoinAddress);
     }
 
     function createNewRound(
@@ -101,17 +104,16 @@ contract PrivateRounds is AccessControl {
         require(_startAt >= block.timestamp, "start at < now");
         require(_endAt >= _startAt, "end at < start at");
         require(_endAt <= block.timestamp + 90 days, "end at is too far");
-        require(_target >= 0.5 ether, "target < 1 ETH");
         require(_target <= _groupAllocation, "target > groupAllocation");
 
         rounds[numOfRounds] = Round({
             target: _target,
             groupAllocation: _groupAllocation,
             maxPledge: _maxPledge,
-            totalEthPledged: 0,
+            totalUsdPledged: 0,
             startAt: _startAt,
             endAt: _endAt,
-            isEthClaimed: false,
+            isUsdClaimed: false,
             totalTokensReceived: 0,
             tokenAddress: address(0)
         });
@@ -121,6 +123,7 @@ contract PrivateRounds is AccessControl {
             numOfRounds,
             _target,
             _groupAllocation,
+            _maxPledge,
             _startAt,
             _endAt
         );
@@ -162,7 +165,10 @@ contract PrivateRounds is AccessControl {
         emit RoundCanceled(_roundId);
     }
 
-    function pledge(uint32 _roundId) external payable onlyRole(MEMBER_ROLE) {
+    function pledge(
+        uint32 _roundId,
+        uint _amount
+    ) external onlyRole(MEMBER_ROLE) {
         Round storage round = rounds[_roundId];
 
         if (block.timestamp < round.startAt)
@@ -178,19 +184,29 @@ contract PrivateRounds is AccessControl {
             });
 
         require(
-            pledgedAmounts[_roundId][msg.sender] + msg.value <= round.maxPledge,
+            pledgedAmounts[_roundId][msg.sender] + _amount <= round.maxPledge,
             "cumulative pledge > maxPledge"
         );
         require(
-            round.totalEthPledged + msg.value <= round.groupAllocation,
+            round.totalUsdPledged + _amount <= round.groupAllocation,
             "exceeds groupAllocation"
         );
 
-        round.totalEthPledged += msg.value;
-        pledgedAmounts[_roundId][msg.sender] += msg.value;
+        bool received = stablecoinContract.transferFrom(
+            msg.sender,
+            address(this),
+            _amount
+        );
 
-        emit Pledged(_roundId, msg.sender, msg.value);
-        emit TotalEthPledgedChanged(_roundId, round.totalEthPledged);
+        if (!received) {
+            revert TxUnsuccessful();
+        }
+
+        round.totalUsdPledged += _amount;
+        pledgedAmounts[_roundId][msg.sender] += _amount;
+
+        emit Pledged(_roundId, msg.sender, _amount);
+        emit TotalUsdPledgedChanged(_roundId, round.totalUsdPledged);
     }
 
     function unpledge(
@@ -206,58 +222,57 @@ contract PrivateRounds is AccessControl {
             ? _amount
             : pledgedAmountBySender;
 
-        round.totalEthPledged -= amountToUnpledge;
+        round.totalUsdPledged -= amountToUnpledge;
         pledgedAmounts[_roundId][msg.sender] -= amountToUnpledge;
 
-        (bool sent, ) = payable(msg.sender).call{value: amountToUnpledge}("");
+        bool received = stablecoinContract.transfer(
+            msg.sender,
+            amountToUnpledge
+        );
 
-        if (!sent) {
+        if (!received) {
             revert TxUnsuccessful();
         }
 
         emit Unpledged(_roundId, msg.sender, amountToUnpledge);
-        emit TotalEthPledgedChanged(_roundId, round.totalEthPledged);
+        emit TotalUsdPledgedChanged(_roundId, round.totalUsdPledged);
     }
 
-    function withdrawTotalEthPledged(
+    function withdrawTotalUsdPledged(
         uint32 _roundId
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         Round storage round = rounds[_roundId];
 
         require(block.timestamp > round.endAt, "not ended");
-        require(round.totalEthPledged >= round.target, "round failed");
-        require(!round.isEthClaimed, "already claimed");
+        require(round.totalUsdPledged >= round.target, "round failed");
+        require(!round.isUsdClaimed, "already claimed");
 
-        round.isEthClaimed = true;
+        round.isUsdClaimed = true;
 
-        uint iguanaFee = (round.totalEthPledged * 80) / 10_000;
+        bool sent = stablecoinContract.transfer(
+            msg.sender,
+            round.totalUsdPledged
+        );
 
-        (bool sent, ) = payable(0xE6ae1e6B67ad5D92F9a16B4CcaB45210DA43c8Da)
-            .call{value: iguanaFee}("");
-
-        (bool sent2, ) = payable(msg.sender).call{
-            value: round.totalEthPledged - iguanaFee
-        }("");
-
-        if (!sent || !sent2) {
+        if (!sent) {
             revert TxUnsuccessful();
         }
 
-        emit TotalEthWithdrawn(_roundId);
+        emit TotalUsdWithdrawn(_roundId);
     }
 
     function refund(uint32 _roundId) external {
         Round storage round = rounds[_roundId];
 
         require(block.timestamp > round.endAt, "not ended");
-        require(round.totalEthPledged < round.target, "round succeeded");
+        require(round.totalUsdPledged < round.target, "round succeeded");
 
         uint balance = pledgedAmounts[_roundId][msg.sender];
         pledgedAmounts[_roundId][msg.sender] = 0;
 
         require(balance > 0, "nothing to refund");
 
-        (bool sent, ) = payable(msg.sender).call{value: balance}("");
+        bool sent = stablecoinContract.transfer(msg.sender, balance);
 
         if (!sent) {
             revert TxUnsuccessful();
@@ -274,7 +289,7 @@ contract PrivateRounds is AccessControl {
         Round storage round = rounds[_roundId];
 
         require(block.timestamp > round.endAt, "not ended");
-        require(round.totalEthPledged >= round.target, "round failed");
+        require(round.totalUsdPledged >= round.target, "round failed");
         require(round.totalTokensReceived == 0, "tokens already deposited");
 
         bool receivedTokens = IERC20(_tokenAddress).transferFrom(
@@ -299,7 +314,7 @@ contract PrivateRounds is AccessControl {
         Round storage round = rounds[_roundId];
 
         require(block.timestamp > round.endAt, "not ended");
-        require(round.totalEthPledged >= round.target, "round failed");
+        require(round.totalUsdPledged >= round.target, "round failed");
         require(round.totalTokensReceived > 0, "no tokens to withdraw");
 
         uint remainingTokenBalance = IERC20(round.tokenAddress).balanceOf(
@@ -333,7 +348,7 @@ contract PrivateRounds is AccessControl {
         require(pledgedEthAmount > 0, "no claim");
 
         uint tokensToBeClaimed = (pledgedEthAmount *
-            round.totalTokensReceived) / round.totalEthPledged;
+            round.totalTokensReceived) / round.totalUsdPledged;
 
         pledgedAmounts[_roundId][msg.sender] = 0;
         bool sentTokens = IERC20(round.tokenAddress).transfer(
@@ -348,32 +363,9 @@ contract PrivateRounds is AccessControl {
         emit InvestorClaimedTokens(_roundId, msg.sender, tokensToBeClaimed);
     }
 
-    function getTotalEthPledged(
+    function getTotalUsdPledged(
         uint32 _roundId
-    ) external view returns (uint totalEthPledged) {
-        return rounds[_roundId].totalEthPledged;
-    }
-
-    function getPledgedAmount(
-        uint32 _roundId,
-        address memberAddress
-    ) external view returns (uint amountPledged) {
-        return pledgedAmounts[_roundId][memberAddress];
-    }
-
-    function grantMemberRole(
-        address[] memory newMemberAddresses
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        for (uint32 i = 0; i < newMemberAddresses.length; i++) {
-            _grantRole(MEMBER_ROLE, newMemberAddresses[i]);
-        }
-    }
-
-    function revokeMemberRole(
-        address[] memory oldMemberAddresses
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        for (uint32 i = 0; i < oldMemberAddresses.length; i++) {
-            _revokeRole(MEMBER_ROLE, oldMemberAddresses[i]);
-        }
+    ) external view returns (uint totalUsdPledged) {
+        return rounds[_roundId].totalUsdPledged;
     }
 }

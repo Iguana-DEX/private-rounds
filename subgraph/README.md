@@ -13,21 +13,23 @@ graph init --product hosted-service styliann-eth/iguanadex-private-groups
 Follow the options and enter 2 contract addresses:
 
 - the address of the PrivateGroupFactory
-- the address of the first group deployed using the factory (PrivateRounds smart contract). Usually "Iggies Club" on every chain.
+- the address of the first group deployed using the factory (PrivateRounds smart contract). Usually "Dewhales" on most chains.
 
 You will need to manually verify the PrivateRounds contract using:
 npx hardhat verify --network <network> <contract_address> <constructor_input1> <constructor_input2>
 
 ```bash
-npx hardhat verify --network bscTestnet <contract_address> 0x712F493C6AdBFaC93bDCE6b83E1C2b48761ACA6F "Iggies Club"
+npx hardhat verify --network bscTestnet <contract_address> <deployer_address> "Dewhales"
 ```
+
+=> Remove the .git folder in newly generated folder
 
 ### Tweak the generated files in the newly created subgraph folder
 
-In the newly generated schema.graphql file:
+In the newly generated subgraph.yaml file:
 
-- remove the address line in the 'source' section for PrivateRounds.
 - add a 'templates: ' line above the - kind: ethereum line for PrivateRounds
+- remove the address line in the 'source' section for PrivateRounds.
 
 In a terminal, navigate to the newly created subgraph folder (e.g. private-rounds/subgraph-test) and type the following:
 
@@ -53,5 +55,5 @@ yarn build && yarn deploy
 In a terminal, navigate to the private-rounds root folder and enter:
 
 ```bash
-node subgraph/sample-queries/index.js
+node sample-queries/index.js
 ```

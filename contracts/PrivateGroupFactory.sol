@@ -4,10 +4,10 @@ pragma solidity ^0.8.9;
 /// @title PrivateGroupFactory - Deploy new PrivateRounds contracts
 /// @author styliann.eth <ns2808@proton.me>
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./PrivateRounds.sol";
 
-contract PrivateGroupFactory is Ownable {
+contract PrivateGroupFactory is AccessControl {
     event NewGroupCreated(
         uint32 groupId,
         address groupAddress,
@@ -23,12 +23,20 @@ contract PrivateGroupFactory is Ownable {
 
     PrivateRounds[] public groups;
 
+    // Investor addresses must be granted MEMBER_ROLE by contract deployer
+    bytes32 public constant CONTRACT_CREATOR_ROLE =
+        keccak256("CONTRACT_CREATOR_ROLE");
+
     constructor() {
         // IguanaDEX Safe gets DEFAULT_ADMIN_ROLE
-        _transferOwnership(0xE6ae1e6B67ad5D92F9a16B4CcaB45210DA43c8Da);
-
-        // For testing on BSC Testnet
-        _transferOwnership(0x712F493C6AdBFaC93bDCE6b83E1C2b48761ACA6F);
+        _grantRole(
+            DEFAULT_ADMIN_ROLE,
+            0xE6ae1e6B67ad5D92F9a16B4CcaB45210DA43c8Da
+        );
+        _grantRole(
+            CONTRACT_CREATOR_ROLE,
+            0xE6ae1e6B67ad5D92F9a16B4CcaB45210DA43c8Da
+        );
     }
 
     function createNewGroup(
@@ -36,7 +44,7 @@ contract PrivateGroupFactory is Ownable {
         string memory _description,
         string memory _imageUrl,
         string memory _infoUrl
-    ) public onlyOwner {
+    ) public onlyRole(CONTRACT_CREATOR_ROLE) {
         PrivateRounds group = new PrivateRounds(msg.sender, _groupName);
         groups.push(group);
 
@@ -58,7 +66,12 @@ contract PrivateGroupFactory is Ownable {
         string memory _description,
         string memory _imageUrl,
         string memory _infoUrl
-    ) public onlyOwner {
+    ) public onlyRole(CONTRACT_CREATOR_ROLE) {
+        bool isDefaultAdmin = PrivateRounds(groups[_groupId]).hasRole(
+            DEFAULT_ADMIN_ROLE,
+            msg.sender
+        );
+        require(isDefaultAdmin, "need DEFAULT_ADMIN_ROLE");
         emit GroupInfoChanged(
             _groupId,
             _groupName,

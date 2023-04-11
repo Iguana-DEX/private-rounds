@@ -96,6 +96,6 @@ const roundInfoQuery = gql`
 `;
 
 request(
-  'https://api.thegraph.com/subgraphs/name/styliann-eth/iguanadex-private-groups',
+  'https://api.thegraph.com/subgraphs/name/iguana-dex/bsctestnet',
   roundInfoQuery
 ).then((data) => console.log(data));

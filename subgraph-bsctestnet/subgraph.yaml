@@ -1,0 +1,94 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: PrivateGroupFactory
+    network: chapel
+    source:
+      address: '0x237F0B5FDFC744084aD269c87eE1cc8B23D0157e'
+      abi: PrivateGroupFactory
+      startBlock: 28925786
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GroupInfoChanged
+        - NewGroupCreated
+        - RoleAdminChanged
+        - RoleGranted
+        - RoleRevoked
+      abis:
+        - name: PrivateGroupFactory
+          file: ./abis/PrivateGroupFactory.json
+      eventHandlers:
+        - event: GroupInfoChanged(uint32,string,string,string,string)
+          handler: handleGroupInfoChanged
+        - event: NewGroupCreated(uint32,address,address)
+          handler: handleNewGroupCreated
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleRoleAdminChanged
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleRevoked
+      file: ./src/private-group-factory.ts
+templates:
+  - kind: ethereum
+    name: PrivateRounds
+    network: chapel
+    source:
+      abi: PrivateRounds
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - InvestorClaimedTokens
+        - InvestorRefunded
+        - NewRoundCreated
+        - Pledged
+        - PrivateRoundsRoleAdminChanged
+        - PrivateRoundsRoleGranted
+        - PrivateRoundsRoleRevoked
+        - RoundCanceled
+        - RoundInfoChanged
+        - TokensDeposited
+        - TokensWithdrawn
+        - TotalEthPledgedChanged
+        - TotalEthWithdrawn
+        - Unpledged
+      abis:
+        - name: PrivateRounds
+          file: ./abis/PrivateRounds.json
+      eventHandlers:
+        - event: InvestorClaimedTokens(address,indexed uint32,address,uint256)
+          handler: handleInvestorClaimedTokens
+        - event: InvestorRefunded(address,indexed uint32,indexed address,uint256)
+          handler: handleInvestorRefunded
+        - event: NewRoundCreated(address,uint32,uint256,uint256,uint32,uint32)
+          handler: handleNewRoundCreated
+        - event: Pledged(address,indexed uint32,indexed address,uint256)
+          handler: handlePledged
+        - event: RoleAdminChanged(indexed bytes32,indexed bytes32,indexed bytes32)
+          handler: handleRoleAdminChanged
+        - event: RoleGranted(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleGranted
+        - event: RoleRevoked(indexed bytes32,indexed address,indexed address)
+          handler: handleRoleRevoked
+        - event: RoundCanceled(uint32)
+          handler: handleRoundCanceled
+        - event: RoundInfoChanged(address,uint32,string,string,string,string)
+          handler: handleRoundInfoChanged
+        - event: TokensDeposited(address,indexed uint32,address,uint256)
+          handler: handleTokensDeposited
+        - event: TokensWithdrawn(address,indexed uint32,address,uint256)
+          handler: handleTokensWithdrawn
+        - event: TotalEthPledgedChanged(address,indexed uint32,uint256)
+          handler: handleTotalEthPledgedChanged
+        - event: TotalEthWithdrawn(indexed uint32)
+          handler: handleTotalEthWithdrawn
+        - event: Unpledged(address,indexed uint32,indexed address,uint256)
+          handler: handleUnpledged
+      file: ./src/private-rounds.ts

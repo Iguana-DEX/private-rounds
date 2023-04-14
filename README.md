@@ -2,50 +2,67 @@
 
 ### Deployments
 
-- BSC Testnet: https://thirdweb.com/binance-testnet/0xd8b15A9464b183A7ca2923cb4d9510651F10aA42
-- BNB Chain Mainnet: -
+- BSC Testnet: https://thirdweb.com/binance-testnet/0x237F0B5FDFC744084aD269c87eE1cc8B23D0157e
+- BNB Chain Mainnet: https://thirdweb.com/binance/0x3A352dE5EF98b4B16bEb8AF7E7f47A2F179E6c42
 - Arbitrum: -
 - Polygon: -
 
-## Getting started
+## How to redeploy the Subgraph
 
-Clone the repository:
+### Deploy the new versions of the smart contracts
+
+### Regenerate the subgraph folder for the updated SC versions
+
+In a terminal, navigate to the private-rounds root folder and enter:
 
 ```bash
-git clone https://github.com/styliann-eth/private-rounds.git && cd private-rounds
+graph init --product hosted-service iguana-dex/bsctestnet
 ```
 
-Install all required node.js modules:
+Follow the options and enter 2 contract addresses:
+
+- the address of the PrivateGroupFactory
+- the address of the first group deployed using the factory (PrivateRounds smart contract). Usually "Iggies Club" on most chains.
+
+You will need to manually verify the PrivateRounds contract using:
+npx hardhat verify --network <network> <contract_address> <constructor_input1> <constructor_input2>
 
 ```bash
-yarn
+npx hardhat verify --network bscTestnet <contract_address> <deployer_address> "Dewhales"
 ```
 
-Take a look at the code in:
+=> Remove the .git folder in the newly generated subgraph's folder
 
-- `contracts/PrivateGroupFactory.sol`
-- `contracts/PrivateRounds.sol`
+### Tweak the generated files in the newly created subgraph folder
 
-## Building the project
+In the newly generated subgraph.yaml file:
 
-After any changes to the contract, run:
+- add a 'templates: ' line above the - kind: ethereum line for PrivateRounds
+- remove the address line in the 'source' section for PrivateRounds.
+
+In a terminal, navigate to the newly created subgraph folder (e.g. private-rounds/subgraph-test) and type the following:
 
 ```bash
-yarn build
+graph codegen
 ```
 
-to compile your contracts. This will also detect the [Contracts Extensions Docs](https://portal.thirdweb.com/contractkit) detected on your contract.
+This will add some files to the 'generated' folder
 
-## Deploying Contracts
+Finally, go to src/private-group-factory.ts and make sure the system knows to create a new subgraph whenever a new group (PrivateRounds smart contract) gets created from the PrivateGroupFactory:
 
-When you're ready to deploy your contracts, just run one of the following command to deploy you're contracts:
+- import { PrivateRounds } from '../generated/templates'; [top of file]
+- PrivateRounds.create(event.params.groupAddress); [in handleNewGroupCreated() function]
+
+### Redeploy the subgraph
 
 ```bash
-yarn deploy
+yarn build && yarn deploy
 ```
 
-From the root /private-rounds folder, use the following to test the subgraph:
+### Test the new version of the subgraph
+
+In a terminal, navigate to the private-rounds root folder and enter:
 
 ```bash
-node subgraph/sample-queries/index.js
+node sample-queries/index.js
 ```

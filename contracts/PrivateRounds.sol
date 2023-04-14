@@ -30,30 +30,44 @@ contract PrivateRounds is AccessControl {
         string roundInfoUrl
     );
     event RoundCanceled(uint32 roundId);
-    event Pledged(uint32 indexed roundId, address indexed caller, uint amount);
-    event Unpledged(
+    event Pledged(
+        address groupAddress,
         uint32 indexed roundId,
         address indexed caller,
         uint amount
     );
-    event TotalEthPledgedChanged(uint32 indexed roundId, uint totalEthPledged);
+    event Unpledged(
+        address groupAddress,
+        uint32 indexed roundId,
+        address indexed caller,
+        uint amount
+    );
+    event TotalEthPledgedChanged(
+        address groupAddress,
+        uint32 indexed roundId,
+        uint totalEthPledged
+    );
     event TotalEthWithdrawn(uint32 indexed roundId);
     event InvestorRefunded(
+        address groupAddress,
         uint32 indexed roundId,
         address indexed caller,
         uint amount
     );
     event TokensDeposited(
+        address groupAddress,
         uint32 indexed roundId,
         address tokenAddress,
         uint amount
     );
     event InvestorClaimedTokens(
+        address groupAddress,
         uint32 indexed roundId,
         address investorAddress,
         uint amount
     );
     event TokensWithdrawn(
+        address groupAddress,
         uint32 indexed roundId,
         address tokenAddress,
         uint amount
@@ -189,8 +203,12 @@ contract PrivateRounds is AccessControl {
         round.totalEthPledged += msg.value;
         pledgedAmounts[_roundId][msg.sender] += msg.value;
 
-        emit Pledged(_roundId, msg.sender, msg.value);
-        emit TotalEthPledgedChanged(_roundId, round.totalEthPledged);
+        emit Pledged(address(this), _roundId, msg.sender, msg.value);
+        emit TotalEthPledgedChanged(
+            address(this),
+            _roundId,
+            round.totalEthPledged
+        );
     }
 
     function unpledge(
@@ -215,8 +233,12 @@ contract PrivateRounds is AccessControl {
             revert TxUnsuccessful();
         }
 
-        emit Unpledged(_roundId, msg.sender, amountToUnpledge);
-        emit TotalEthPledgedChanged(_roundId, round.totalEthPledged);
+        emit Unpledged(address(this), _roundId, msg.sender, amountToUnpledge);
+        emit TotalEthPledgedChanged(
+            address(this),
+            _roundId,
+            round.totalEthPledged
+        );
     }
 
     function withdrawTotalEthPledged(
@@ -263,7 +285,7 @@ contract PrivateRounds is AccessControl {
             revert TxUnsuccessful();
         }
 
-        emit InvestorRefunded(_roundId, msg.sender, balance);
+        emit InvestorRefunded(address(this), _roundId, msg.sender, balance);
     }
 
     function depositTokens(
@@ -290,7 +312,7 @@ contract PrivateRounds is AccessControl {
         round.totalTokensReceived = _amount;
         round.tokenAddress = _tokenAddress;
 
-        emit TokensDeposited(_roundId, _tokenAddress, _amount);
+        emit TokensDeposited(address(this), _roundId, _tokenAddress, _amount);
     }
 
     function withdrawTokens(
@@ -317,6 +339,7 @@ contract PrivateRounds is AccessControl {
         round.totalTokensReceived = 0;
 
         emit TokensWithdrawn(
+            address(this),
             _roundId,
             round.tokenAddress,
             remainingTokenBalance
@@ -345,7 +368,12 @@ contract PrivateRounds is AccessControl {
             revert TxUnsuccessful();
         }
 
-        emit InvestorClaimedTokens(_roundId, msg.sender, tokensToBeClaimed);
+        emit InvestorClaimedTokens(
+            address(this),
+            _roundId,
+            msg.sender,
+            tokensToBeClaimed
+        );
     }
 
     function getTotalEthPledged(

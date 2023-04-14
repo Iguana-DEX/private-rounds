@@ -1,0 +1,11 @@
+{
+  "bsc": {
+    "PrivateGroupFactory": {
+      "address": "0x3A352dE5EF98b4B16bEb8AF7E7f47A2F179E6c42",
+      "startBlock": 27339642
+    },
+    "PrivateRounds": {
+      "address": "0x70b9525ba0a947cca73034a27907cc1041446676"
+    }
+  }
+}
